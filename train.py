@@ -12,14 +12,16 @@ from xgboost import XGBRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
 def train_and_save_model(data_path="flight_dataset.csv", model_path="model.pkl", meta_path="model_metadata.pkl"):
-    print("🚀 Initializing Pipeline Training and Selection Matrix...")
+    print("🚀 Initializing Ultra-Fast Pipeline Training Engine...")
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Core asset mismatch: '{data_path}' could not be located.")
         
     df = pd.read_csv(data_path)
-    
-    # Strip any accidental leading/trailing whitespace from column headers
     df.columns = df.columns.str.strip()
+    
+    # CRITICAL ACCELERATION STEP: Drop flight column to remove high-cardinality dimensions
+    if 'flight' in df.columns:
+        df = df.drop(columns=['flight'])
     
     target_col = "price"
     if target_col not in df.columns:
@@ -51,13 +53,14 @@ def train_and_save_model(data_path="flight_dataset.csv", model_path="model.pkl",
         ('cat', cat_transformer, categorical_cols)
     ])
     
+    # Downsample slightly for faster training or keep 0.2 split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
+    # Configured for high-speed computation execution
     models = {
-        "Random Forest Regressor": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
-        "Extra Trees Regressor": ExtraTreesRegressor(n_estimators=100, random_state=42, n_jobs=-1),
-        "Gradient Boosting Regressor": GradientBoostingRegressor(n_estimators=100, random_state=42),
-        "XGBoost Regressor": XGBRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+        "XGBoost Regressor": XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1),
+        "Random Forest Regressor": RandomForestRegressor(n_estimators=50, max_depth=12, random_state=42, n_jobs=-1),
+        "Extra Trees Regressor": ExtraTreesRegressor(n_estimators=50, max_depth=12, random_state=42, n_jobs=-1)
     }
     
     best_model_name = None
@@ -85,10 +88,8 @@ def train_and_save_model(data_path="flight_dataset.csv", model_path="model.pkl",
             
     print(f"🏆 Champion Architecture: {best_model_name} with R²: {best_score:.4f}")
     
-    # Store complete architecture pipeline
     joblib.dump(best_pipeline, model_path)
     
-    # Package clean metadata dictionary for operational use
     unique_cat_values = {col: df[col].dropna().unique().tolist() for col in categorical_cols}
     
     metadata = {
@@ -101,7 +102,7 @@ def train_and_save_model(data_path="flight_dataset.csv", model_path="model.pkl",
         "unique_values": unique_cat_values
     }
     joblib.dump(metadata, meta_path)
-    print("💾 Core artifacts successfully compiled and exported.")
+    print("💾 Speed-optimized artifacts compiled and exported.")
     return metadata
 
 if __name__ == "__main__":
