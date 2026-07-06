@@ -7,19 +7,19 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
-from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
 from xgboost import XGBRegressor
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
 def train_and_save_model(data_path="flight_dataset.csv", model_path="model.pkl", meta_path="model_metadata.pkl"):
-    print("🚀 Initializing Ultra-Fast Pipeline Training Engine...")
+    print("🚀 Initializing Optimized Pipeline Training Engine...")
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Core asset mismatch: '{data_path}' could not be located.")
         
     df = pd.read_csv(data_path)
     df.columns = df.columns.str.strip()
     
-    # CRITICAL ACCELERATION STEP: Drop flight column to remove high-cardinality dimensions
+    # Remove granular flight column to reduce dimensionality and ensure fast training
     if 'flight' in df.columns:
         df = df.drop(columns=['flight'])
     
@@ -30,14 +30,9 @@ def train_and_save_model(data_path="flight_dataset.csv", model_path="model.pkl",
     X = df.drop(columns=[target_col])
     y = df[target_col]
     
-    # Auto-detection schema
     categorical_cols = X.select_dtypes(include=['object', 'category']).columns.tolist()
     numerical_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
     
-    print(f"📊 Auto-Detected Numerical Features: {numerical_cols}")
-    print(f"📊 Auto-Detected Categorical Features: {categorical_cols}")
-    
-    # Transformers
     num_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler())
@@ -53,14 +48,11 @@ def train_and_save_model(data_path="flight_dataset.csv", model_path="model.pkl",
         ('cat', cat_transformer, categorical_cols)
     ])
     
-    # Downsample slightly for faster training or keep 0.2 split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    # Configured for high-speed computation execution
     models = {
         "XGBoost Regressor": XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1),
-        "Random Forest Regressor": RandomForestRegressor(n_estimators=50, max_depth=12, random_state=42, n_jobs=-1),
-        "Extra Trees Regressor": ExtraTreesRegressor(n_estimators=50, max_depth=12, random_state=42, n_jobs=-1)
+        "Random Forest Regressor": RandomForestRegressor(n_estimators=50, max_depth=12, random_state=42, n_jobs=-1)
     }
     
     best_model_name = None
@@ -69,7 +61,6 @@ def train_and_save_model(data_path="flight_dataset.csv", model_path="model.pkl",
     best_metrics = {}
     
     for name, model in models.items():
-        print(f"⏳ Training matrix entry: {name}...")
         pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('regressor', model)])
         pipeline.fit(X_train, y_train)
         
@@ -78,16 +69,12 @@ def train_and_save_model(data_path="flight_dataset.csv", model_path="model.pkl",
         mae = mean_absolute_error(y_test, preds)
         rmse = np.sqrt(mean_squared_error(y_test, preds))
         
-        print(f"   ✨ {name} -> R²: {r2:.4f} | MAE: {mae:.2f} | RMSE: {rmse:.2f}")
-        
         if r2 > best_score:
             best_score = r2
             best_model_name = name
             best_pipeline = pipeline
             best_metrics = {"R2": r2, "MAE": mae, "RMSE": rmse}
             
-    print(f"🏆 Champion Architecture: {best_model_name} with R²: {best_score:.4f}")
-    
     joblib.dump(best_pipeline, model_path)
     
     unique_cat_values = {col: df[col].dropna().unique().tolist() for col in categorical_cols}
