@@ -296,7 +296,7 @@ elif page_selection == "Visual Analytics Analytics":
             fig_class_violin = px.violin(df_filtered, y="price", x="class", color="class", box=True, points="all", title="Pricing Dispersion Violin Map by Class")
             st.plotly_chart(fig_class_violin, use_container_width=True)
         with d2:
-            fig_stops_avg = px.bar(df_filtered.groupby("stops")["price"].mean().reset_index(), x="stops", y="price", title="Mean Ticket Pricing by Stops", color="stops", color_discrete_sequence=px.colors.sequential.Agrid)
+            fig_stops_avg = px.bar(df_filtered.groupby("stops")["price"].mean().reset_index(), x="stops", y="price", title="Mean Ticket Pricing by Stops", color="stops")
             st.plotly_chart(fig_stops_avg, use_container_width=True)
 
         st.markdown("## ⏰ E. Chronological Temporal Flight Allocation Boundaries")
