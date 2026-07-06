@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as px_go
+import plotly.graph_objects as go
 import joblib
 import os
 from train import train_and_save_model
@@ -70,7 +70,7 @@ st.markdown("""
         background-color: #0f172a;
     }
     </style>
-""", unsafe_unsafe_html=True)
+""", unsafe_allow_html=True)
 
 # 3. Dynamic Artifact Guardrail Verification
 DATA_FILE = "flight_dataset.csv"
@@ -278,7 +278,7 @@ elif page_selection == "Visual Analytics Analytics":
             fig_class_violin = px.violin(df_filtered, y="price", x="class", color="class", box=True, points="all", title="Continuous Pricing Dispersion Structural Violin Map by Class Grouping")
             st.plotly_chart(fig_class_violin, use_container_width=True)
         with d2:
-            fig_stops_avg = px.bar(df_filtered.groupby("stops")["price"].mean().reset_index(), x="stops", y="price", title="Mean Ticket Pricing Escalation Matrix via Structural Routing Nodes", color="stops", color_discrete_sequence=px.colors.sequential.Aquader)
+            fig_stops_avg = px.bar(df_filtered.groupby("stops")["price"].mean().reset_index(), x="stops", y="price", title="Mean Ticket Pricing Escalation Matrix via Structural Routing Nodes", color="stops", color_discrete_sequence=px.colors.sequential.Agrid)
             st.plotly_chart(fig_stops_avg, use_container_width=True)
 
         # E. Chrono Temporal Domain Profiles
@@ -324,7 +324,7 @@ elif page_selection == "Visual Analytics Analytics":
         with h3:
             st.markdown("#### 🌆 Average Terminal Value Grouping across Source City Systems")
             st.dataframe(df_filtered.groupby("source_city")["price"].mean().reset_index().sort_values(by="price", ascending=False), use_container_width=True)
-        with d4:
+        with h4:
             st.markdown("#### 🏙️ Average Terminal Outflow Ticket Valuations across Destination Zones")
             st.dataframe(df_filtered.groupby("destination_city")["price"].mean().reset_index().sort_values(by="price", ascending=False), use_container_width=True)
 
