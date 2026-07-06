@@ -5,9 +5,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 import joblib
 import os
-from train import train_and_save_model
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.impute import SimpleImputer
+from xgboost import XGBRegressor
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
-# 1. Page Configuration
+# 1. Page Configuration Configuration
 st.set_page_config(
     page_title="Flight Price Intelligence Portal",
     page_icon="✈️",
@@ -15,64 +21,87 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Premium Branding Custom CSS Injection
+# 2. Inline Training Engine Definition (Eliminates File Import Errors)
+def internal_train_pipeline(data_path, model_path, meta_path):
+    df = pd.read_csv(data_path)
+    df.columns = df.columns.str.strip()
+    
+    # Remove high-cardinality flight column to ensure ultra-fast execution
+    if 'flight' in df.columns:
+        df = df.drop(columns=['flight'])
+    
+    X = df.drop(columns=["price"])
+    y = df["price"]
+    
+    categorical_cols = X.select_dtypes(include=['object', 'category']).columns.tolist()
+    numerical_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
+    
+    num_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler())
+    ])
+    
+    cat_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='most_frequent')),
+        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+    ])
+    
+    preprocessor = ColumnTransformer(transformers=[
+        ('num', num_transformer, numerical_cols),
+        ('cat', cat_transformer, categorical_cols)
+    ])
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # Using high-performance optimized XGBoost Regressor directly
+    model = XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1)
+    pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('regressor', model)])
+    pipeline.fit(X_train, y_train)
+    
+    preds = pipeline.predict(X_test)
+    r2 = r2_score(y_test, preds)
+    mae = mean_absolute_error(y_test, preds)
+    rmse = np.sqrt(mean_squared_error(y_test, preds))
+    
+    joblib.dump(pipeline, model_path)
+    
+    unique_cat_values = {col: df[col].dropna().unique().tolist() for col in categorical_cols}
+    metadata = {
+        "training_columns": X.columns.tolist(),
+        "categorical_columns": categorical_cols,
+        "numerical_columns": numerical_cols,
+        "best_model_name": "XGBoost Regressor",
+        "best_score": r2,
+        "metrics": {"R2": r2, "MAE": mae, "RMSE": rmse},
+        "unique_values": unique_cat_values
+    }
+    joblib.dump(metadata, meta_path)
+    return metadata
+
+# 3. Premium Branding Custom CSS Injection
 st.markdown("""
     <style>
-    .main {
-        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-        color: #f8fafc;
-    }
-    .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-    }
+    .main { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); color: #f8fafc; }
+    .stApp { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); }
     div.stButton > button:first-child {
         background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
-        color: white;
-        border-radius: 8px;
-        border: none;
-        padding: 0.6rem 2rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
+        color: white; border-radius: 8px; border: none; padding: 0.6rem 2rem; font-weight: 600;
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
     }
-    div.stButton > button:first-child:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
-    }
     .kpi-card {
-        background: rgba(30, 41, 59, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        padding: 1.5rem;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px; padding: 1.5rem; text-align: center;
     }
     .premium-price-card {
         background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
-        border: 2px solid #3b82f6;
-        border-radius: 16px;
-        padding: 2.5rem;
-        text-align: center;
-        margin: 2rem 0;
-        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.2);
+        border: 2px solid #3b82f6; border-radius: 16px; padding: 2.5rem; text-align: center; margin: 2rem 0;
     }
-    .premium-price {
-        font-size: 3rem;
-        font-weight: 800;
-        color: #60a5fa;
-        text-shadow: 0 0 15px rgba(96, 165, 250, 0.4);
-    }
-    h1, h2, h3 {
-        color: #ffffff !important;
-        font-family: 'Inter', sans-serif;
-    }
-    .sidebar .sidebar-content {
-        background-color: #0f172a;
-    }
+    .premium-price { font-size: 3rem; font-weight: 800; color: #60a5fa; }
+    h1, h2, h3 { color: #ffffff !important; font-family: 'Inter', sans-serif; }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Dynamic Artifact Guardrail Verification
+# 4. Target Variables & File Paths
 DATA_FILE = "flight_dataset.csv"
 MODEL_FILE = "model.pkl"
 META_FILE = "model_metadata.pkl"
@@ -88,28 +117,23 @@ def load_raw_dataset(path):
 df_raw = load_raw_dataset(DATA_FILE)
 
 if df_raw is None:
-    st.error(f"🚨 Essential system source '{DATA_FILE}' is missing.")
+    st.error(f"🚨 Essential system dataset file '{DATA_FILE}' is missing from the directory.")
     st.stop()
 
-# Auto-generation framework trigger if artifacts are absent
+# Auto-train block if files are missing from directory
 if not os.path.exists(MODEL_FILE) or not os.path.exists(META_FILE):
-    with st.spinner("⏳ Operational model structures missing. Executing auto-calibration pipeline..."):
+    with st.spinner("⏳ Operational model binaries missing. Automatically generating optimized ML models..."):
         try:
-            metadata = train_and_save_model(DATA_FILE, MODEL_FILE, META_FILE)
-            st.success("🎉 Machine learning pipeline safely constructed and loaded.")
+            metadata = internal_train_pipeline(DATA_FILE, MODEL_FILE, META_FILE)
+            model_pipeline = joblib.load(MODEL_FILE)
         except Exception as e:
-            st.error(f"💥 Compilation lifecycle failed: {str(e)}")
-            st.info("💡 Manual Fix: Run 'python train.py' directly in your terminal to generate the files first, then refresh this page.")
+            st.error(f"💥 Failed to auto-train model structure: {str(e)}")
             st.stop()
-
-# Double check file existence before calling joblib to prevent crash
-if os.path.exists(MODEL_FILE) and os.path.exists(META_FILE):
+else:
     model_pipeline = joblib.load(MODEL_FILE)
     metadata = joblib.load(META_FILE)
-else:
-    st.error("🚨 Critical Error: Model artifacts could not be generated. Please run `python train.py` manually in your terminal.")
-    st.stop()
-# 4. Global Sidebar Routing Context
+
+# 5. Global Sidebar Navigation
 st.sidebar.markdown("<h2 style='text-align: center; color: white;'>✈️ Flight Portal</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 page_selection = st.sidebar.radio(
@@ -181,22 +205,26 @@ elif page_selection == "Price Engine Unit":
 
     st.markdown("---")
     if st.button("✨ Evaluate & Execute Inference Pipeline"):
-        try:
-            payload_df = pd.DataFrame([input_payload])
-            payload_df = payload_df[train_cols]
-            
-            prediction = model_pipeline.predict(payload_df)[0]
-            
-            st.markdown(f"""
-                <div class='premium-price-card'>
-                    <h2>Calculated Expected Flight Value</h2>
-                    <div class='premium-price'>₹ {prediction:,.2f}</div>
-                    <p style='color: #94a3b8; margin-top: 1rem;'>System Engine Verification Confidence: <b>{(metadata['best_score']*100):.2f}% (R²)</b></p>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        except Exception as e:
-            st.error(f"❌ Structural error vector encountered during inference compilation: {str(e)}")
+        # INTERCEPT IDENTICAL ROUTE ANOMALIES (Kolkata to Kolkata, etc.)
+        if input_payload.get('source_city') == input_payload.get('destination_city'):
+            st.error("❌ **Invalid Route Selected:** The origin departure city cannot match your target destination city. Please adjust your travel configurations.")
+        else:
+            try:
+                payload_df = pd.DataFrame([input_payload])
+                payload_df = payload_df[train_cols]
+                
+                prediction = model_pipeline.predict(payload_df)[0]
+                
+                st.markdown(f"""
+                    <div class='premium-price-card'>
+                        <h2>Calculated Expected Flight Value</h2>
+                        <div class='premium-price'>₹ {prediction:,.2f}</div>
+                        <p style='color: #94a3b8; margin-top: 1rem;'>System Engine Verification Confidence: <b>{(metadata['best_score']*100):.2f}% (R²)</b></p>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+            except Exception as e:
+                st.error(f"❌ Structural error vector encountered during inference compilation: {str(e)}")
 
 # --- PAGE 3: VISUAL ANALYTICS DASHBOARD ---
 elif page_selection == "Visual Analytics Analytics":
