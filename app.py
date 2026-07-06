@@ -99,12 +99,16 @@ if not os.path.exists(MODEL_FILE) or not os.path.exists(META_FILE):
             st.success("🎉 Machine learning pipeline safely constructed and loaded.")
         except Exception as e:
             st.error(f"💥 Compilation lifecycle failed: {str(e)}")
+            st.info("💡 Manual Fix: Run 'python train.py' directly in your terminal to generate the files first, then refresh this page.")
             st.stop()
 
-# Load operational binaries
-model_pipeline = joblib.load(MODEL_FILE)
-metadata = joblib.load(META_FILE)
-
+# Double check file existence before calling joblib to prevent crash
+if os.path.exists(MODEL_FILE) and os.path.exists(META_FILE):
+    model_pipeline = joblib.load(MODEL_FILE)
+    metadata = joblib.load(META_FILE)
+else:
+    st.error("🚨 Critical Error: Model artifacts could not be generated. Please run `python train.py` manually in your terminal.")
+    st.stop()
 # 4. Global Sidebar Routing Context
 st.sidebar.markdown("<h2 style='text-align: center; color: white;'>✈️ Flight Portal</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
