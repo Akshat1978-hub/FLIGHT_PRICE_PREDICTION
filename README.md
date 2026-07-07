@@ -1,3 +1,2 @@
 # Flight Price Predict
-
-Generated project scaffold.
+link: https://flightpriceprediction-02.streamlit.app/
